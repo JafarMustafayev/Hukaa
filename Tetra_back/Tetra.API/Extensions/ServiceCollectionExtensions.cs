@@ -11,7 +11,6 @@ public static class ServiceCollectionExtensions
             {
                 options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
             }).AddDataAnnotationsLocalization();
-            services.AddOpenApi();
 
             services.AddApplicationServiceCollection(configuration);
             services.AddInfrastructureServiceCollection(configuration);
