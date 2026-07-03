@@ -5,6 +5,7 @@ namespace Tetra.API.Controllers;
 public class SessionController(
     ISessionService sessionService) : ControllerBase
 {
+    [Authorize]
     [HttpGet]
     public async Task<IActionResult> GetMyActiveSessions()
     {
@@ -12,6 +13,7 @@ public class SessionController(
         return StatusCode(res.StatusCode, res);
     }
 
+    [Authorize]
     [HttpDelete("{sessionId}")]
     public async Task<IActionResult> DeleteSession(string sessionId)
     {
@@ -19,6 +21,7 @@ public class SessionController(
         return StatusCode(res.StatusCode, res);
     }
 
+    [Authorize]
     [HttpPost("revoke-others")]
     public async Task<IActionResult> RevokeOthers()
     {

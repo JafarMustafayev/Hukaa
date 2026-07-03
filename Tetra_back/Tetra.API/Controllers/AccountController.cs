@@ -5,6 +5,7 @@
 public class AccountController(
     IAccountService accountService) : ControllerBase
 {
+    [Authorize]
     [HttpGet("me")]
     public async Task<IActionResult> GetMe()
     {
