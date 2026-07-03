@@ -27,3 +27,5 @@ global using Tetra.Application.DTOs.Auth.EmailVerification;
 global using Tetra.Application.DTOs.Auth.Password;
 global using Tetra.Application.DTOs.Account;
 global using Tetra.Application.DTOs.Auth.TwoFactor;
+global using Tetra.Application.Abstractions.Services.Profile;
+global using Tetra.Application.DTOs.Profile;

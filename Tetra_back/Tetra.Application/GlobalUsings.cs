@@ -26,3 +26,5 @@ global using Tetra.Application.DTOs.Auth.Session;
 global using Tetra.Application.DTOs.Account;
 global using Tetra.Application.DTOs.Auth.TwoFactor;
 global using Tetra.Domain.Entities.Users;
+global using Tetra.Application.DTOs.Profile;
+global using Tetra.Application.Options.Validation.Settings;

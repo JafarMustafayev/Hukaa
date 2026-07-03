@@ -53,6 +53,9 @@ global using Tetra.Application.Options.Database;
 global using Tetra.Application.DTOs.Auth.TwoFactor;
 global using Tetra.Application.Abstractions.Repositories.Auth.TwoFactorRepositories;
 global using OtpNet;
+global using Tetra.Application.DTOs.Profile;
+global using Tetra.Application.Abstractions.Repositories.Users.UserProfileRepositories;
+global using Tetra.Domain.Entities.Users;
 //--------------
 global using IdentityOptions = Tetra.Application.Options.Identity.IdentityOptions;
 global using TokenOptions = Tetra.Application.Options.Token.TokenOptions;

@@ -2,6 +2,6 @@
 
 public interface IProfileService
 {
-    //Task<ProfileDto> GetProfileAsync(string userId);
-    //Task<OperationResult> UpdateProfileAsync(string userId, UpdateProfileRequest request);
+    Task<ResponseDto<UserProfileEditResponseDto>> GetProfileEditAsync();
+    Task<ResponseDto<UserProfileEditResponseDto>> UpdateProfileAsync(UpdateUserProfileRequestDto request);
 }
