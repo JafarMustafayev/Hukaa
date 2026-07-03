@@ -170,7 +170,7 @@ const Register = () => {
             UserName: formData.username.trim(),
             email: formData.email.trim(),
             password: formData.password.trim(),
-            DateOfBirth: formData.birthDate ? formData.birthDate.toISOString() : null,
+            DateOfBirth: formData.birthDate ? formData.birthDate.toLocaleDateString("en-CA") : null,
             FirstName: formData.firstName.trim(),
             LastName: formData.lastName.trim()
         };

@@ -5,53 +5,35 @@ import SettingsInput from '../SettingsInput.jsx';
 import SettingsButton from '../SettingsButton.jsx';
 import { EditProfileSkeleton } from '../../skeletons/index.js';
 import { useAuth } from '../../../context/AuthContext';
+import { getSettingsProfile, updateSettingsProfile } from '../../../api/settings.api.js';
+import { toast } from 'react-hot-toast';
+import getCroppedImg from '../../../utils/cropImage.js';
+import { API_BASE_URL } from '../../../api/apiConfig.js';
 
-// Crop Helper: Create image from URL
-const createImage = (url) =>
-    new Promise((resolve, reject) => {
-        const image = new Image();
-        image.addEventListener('load', () => resolve(image));
-        image.addEventListener('error', (error) => reject(error));
-        image.setAttribute('crossOrigin', 'anonymous');
-        image.src = url;
-    });
-
-// Crop Helper: Get cropped image using canvas drawing
-const getCroppedImg = async (imageSrc, pixelCrop) => {
-    const image = await createImage(imageSrc);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-        return null;
+// Helper: Resolve relative image URLs with the API Base URL
+const resolveImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+        return url;
     }
-
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-
-    ctx.drawImage(
-        image,
-        pixelCrop.x,
-        pixelCrop.y,
-        pixelCrop.width,
-        pixelCrop.height,
-        0,
-        0,
-        pixelCrop.width,
-        pixelCrop.height
-    );
-
-    return canvas.toDataURL('image/jpeg');
+    const baseUrl = API_BASE_URL || '';
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    return `${cleanBase}${cleanPath}`;
 };
 
 const EditProfileForm = ({ onBack }) => {
-    const { user, fetchUser } = useAuth();
+    const { user, updateCurrentUser } = useAuth();
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [initialProfile, setInitialProfile] = useState(null);
     const [form, setForm] = useState({
-        firstName: "Jafar",
-        lastName: "Mustafayev",
+        firstName: "",
+        lastName: "",
         bio: "",
-        website: ""
+        birthday: "",
+        website: "",
+        gender: 1
     });
 
     // Image States
@@ -65,12 +47,57 @@ const EditProfileForm = ({ onBack }) => {
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
-    // Simulated network loading delay
+    // Fetch Profile Settings on Mount
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 750);
-        return () => clearTimeout(timer);
+        let isMounted = true;
+        const fetchProfile = async () => {
+            try {
+                const response = await getSettingsProfile();
+                const success = response.success ?? response.Success;
+                if (success && response.data) {
+                    const profileData = response.data;
+                    if (isMounted) {
+                        const initial = {
+                            firstName: profileData.firstName || "",
+                            lastName: profileData.lastName || "",
+                            bio: profileData.bio || "",
+                            birthday: profileData.birthday || "",
+                            website: profileData.website || "",
+                            gender: profileData.gender ?? 1,
+                            avatarImage: resolveImageUrl(profileData.profileImageUrl),
+                            coverImage: resolveImageUrl(profileData.coverImageUrl)
+                        };
+                        setForm({
+                            firstName: initial.firstName,
+                            lastName: initial.lastName,
+                            bio: initial.bio,
+                            birthday: initial.birthday,
+                            website: initial.website,
+                            gender: initial.gender
+                        });
+                        setAvatarImage(initial.avatarImage);
+                        setCoverImage(initial.coverImage);
+                        setInitialProfile(initial);
+                    }
+                } else {
+                    const errorMsg = response.Message || response.message || "Failed to load profile settings.";
+                    toast.error(errorMsg);
+                }
+            } catch (error) {
+                console.error("Error fetching profile settings:", error);
+                toast.error("An unexpected error occurred while loading profile settings.");
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        fetchProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleInputChange = (field, value) => {
@@ -114,10 +141,119 @@ const EditProfileForm = ({ onBack }) => {
         }
     };
 
-    const handleSave = (e) => {
+    const isModified = initialProfile ? (
+        (form.firstName || '').trim() !== initialProfile.firstName ||
+        (form.lastName || '').trim() !== initialProfile.lastName ||
+        (form.bio || '') !== initialProfile.bio ||
+        (form.birthday || '') !== initialProfile.birthday ||
+        (form.website || '') !== initialProfile.website ||
+        (form.gender ?? 1) !== initialProfile.gender ||
+        avatarImage !== initialProfile.avatarImage ||
+        coverImage !== initialProfile.coverImage
+    ) : false;
+
+    const handleSave = async (e) => {
         e.preventDefault();
-        // Backend integration placeholder
-        fetchUser?.();
+
+        if (!form.firstName?.trim()) {
+            toast.error("First name is required.");
+            return;
+        }
+        if (!form.lastName?.trim()) {
+            toast.error("Last name is required.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const formData = new FormData();
+            // Send both FirstName, firstname, and Fistname for compatibility
+            formData.append('FirstName', form.firstName.trim());
+            formData.append('firstname', form.firstName.trim());
+            formData.append('Fistname', form.firstName.trim());
+
+            // Send both LastName, lastname, and lastName for compatibility
+            formData.append('LastName', form.lastName.trim());
+            formData.append('lastname', form.lastName.trim());
+            formData.append('lastName', form.lastName.trim());
+
+            formData.append('bio', form.bio || '');
+            formData.append('website', form.website || '');
+            formData.append('gender', form.gender ?? 1);
+            formData.append('birthday', form.birthday || '');
+
+            if (avatarImage && (avatarImage.startsWith('blob:') || avatarImage.startsWith('data:'))) {
+                try {
+                    const res = await fetch(avatarImage);
+                    const blob = await res.blob();
+                    formData.append('ProfileImage', blob, 'avatar.jpg');
+                } catch (err) {
+                    console.error("Failed to append ProfileImage:", err);
+                }
+            }
+            if (coverImage && (coverImage.startsWith('blob:') || coverImage.startsWith('data:'))) {
+                try {
+                    const res = await fetch(coverImage);
+                    const blob = await res.blob();
+                    formData.append('CoverImage', blob, 'cover.jpg');
+                } catch (err) {
+                    console.error("Failed to append CoverImage:", err);
+                }
+            }
+
+            const response = await updateSettingsProfile(formData);
+            const success = response.success ?? response.Success;
+
+            if (success) {
+                toast.success(response.message || "Profile updated successfully.");
+                const updatedData = response.data || response.Data;
+                if (updatedData) {
+                    const newProfile = {
+                        firstName: updatedData.firstName || "",
+                        lastName: updatedData.lastName || "",
+                        bio: updatedData.bio || "",
+                        birthday: updatedData.birthday || "",
+                        website: updatedData.website || "",
+                        gender: updatedData.gender ?? 1,
+                        avatarImage: resolveImageUrl(updatedData.profileImageUrl),
+                        coverImage: resolveImageUrl(updatedData.coverImageUrl)
+                    };
+
+                    setForm({
+                        firstName: newProfile.firstName,
+                        lastName: newProfile.lastName,
+                        bio: newProfile.bio,
+                        birthday: newProfile.birthday,
+                        website: newProfile.website,
+                        gender: newProfile.gender
+                    });
+                    setAvatarImage(newProfile.avatarImage);
+                    setCoverImage(newProfile.coverImage);
+                    setInitialProfile(newProfile);
+
+                    if (updateCurrentUser) {
+                        updateCurrentUser({
+                            firstName: newProfile.firstName,
+                            lastName: newProfile.lastName,
+                            name: `${newProfile.firstName} ${newProfile.lastName}`.trim(),
+                            bio: newProfile.bio,
+                            profileImageUrl: newProfile.avatarImage,
+                            avatarUrl: newProfile.avatarImage,
+                            coverImageUrl: newProfile.coverImage,
+                            coverUrl: newProfile.coverImage
+                        });
+                    }
+                }
+            } else {
+                const errorMsg = response.message || response.Message || "Failed to update profile.";
+                toast.error(errorMsg);
+            }
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            toast.error("An unexpected error occurred while updating profile.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (isLoading) {
@@ -125,7 +261,7 @@ const EditProfileForm = ({ onBack }) => {
     }
 
     // Get initials fallback (Username first letter)
-    const usernameLetter = user?.username?.[0]?.toUpperCase() || form.name?.[0]?.toUpperCase() || 'U';
+    const usernameLetter = user?.username?.[0]?.toUpperCase() || form.firstName?.[0]?.toUpperCase() || 'U';
 
     return (
         <div className="w-full h-full flex flex-col overflow-y-auto custom-scrollbar bg-white dark:bg-[#09090b]">
@@ -256,12 +392,18 @@ const EditProfileForm = ({ onBack }) => {
                         <label className="block text-[15px] font-bold text-gray-900 dark:text-white mb-2">
                             Bio
                         </label>
-                        <textarea
-                            className="w-full min-h-[100px] p-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-gray-900 dark:text-white focus:outline-none focus:border-main focus:ring-main focus:ring-1 transition-colors text-[15px] resize-y"
-                            value={form.bio}
-                            onChange={(e) => handleInputChange('bio', e.target.value)}
-                            placeholder="Write something about yourself..."
-                        />
+                        <div className="">
+                            <textarea
+                                className="w-full min-h-[100px] pt-4 px-4 pb-8 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-gray-900 dark:text-white focus:outline-none focus:border-main focus:ring-main focus:ring-1 transition-colors text-[15px] resize-y"
+                                value={form.bio}
+                                onChange={(e) => handleInputChange('bio', e.target.value)}
+                                maxLength={500}
+                            />
+                            <div className="text-end text-xs text-gray-400 dark:text-zinc-500 pointer-events-none select-none">
+                                {(form.bio || '').length}/500
+                            </div>
+                        </div>
+
                     </div>
 
                     {/* Website input */}
@@ -272,13 +414,41 @@ const EditProfileForm = ({ onBack }) => {
                         placeholder="https://"
                     />
 
+                    {/* Birthday and Gender input */}
+                    <div className="flex flex-col md:flex-row w-full gap-10">
+                        <div className="flex-1">
+                            <SettingsInput
+                                label="Birthday"
+                                type="date"
+                                value={form.birthday || ''}
+                                onChange={(e) => handleInputChange('birthday', e.target.value)}
+                            />
+                        </div>
+                        <div className="flex-1 mb-5">
+                            <label className="block text-[15px] font-bold text-gray-900 dark:text-white mb-2">
+                                Gender
+                            </label>
+                            <select
+                                className="w-full h-[48px] px-4 rounded-xl border bg-white dark:bg-black text-gray-900 dark:text-white focus:outline-none focus:ring-1 transition-colors text-[15px] border-gray-300 dark:border-gray-700 focus:border-main focus:ring-main cursor-pointer"
+                                value={form.gender ?? 1}
+                                onChange={(e) => handleInputChange('gender', Number(e.target.value))}
+                            >
+                                <option value={1}>Male</option>
+                                <option value={2}>Female</option>
+                                <option value={3}>Non-Binary</option>
+                                <option value={4}>Prefer not to say</option>
+                            </select>
+                        </div>
+                    </div>
+
                     {/* Save button */}
                     <div className="flex justify-end pt-2">
                         <SettingsButton
                             type="submit"
                             variant="primary"
+                            disabled={isSaving || !isModified}
                             className='bg-main! hover:bg-main-hover!'>
-                            Save
+                            {isSaving ? 'Saving...' : 'Save'}
                         </SettingsButton>
                     </div>
                 </form>
